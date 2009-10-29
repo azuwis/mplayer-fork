@@ -107,6 +107,9 @@ char* audio_lang=NULL;
 char* dvdsub_lang=NULL;
 static char* spudec_ifo=NULL;
 
+#ifdef CONFIG_ICONV
+extern char *sub_cps;
+#endif
 static char** audio_codec_list=NULL;  // override audio codec
 static char** video_codec_list=NULL;  // override video codec
 static char** audio_fm_list=NULL;     // override audio codec family

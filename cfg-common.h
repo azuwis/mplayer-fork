@@ -40,6 +40,9 @@ extern int reuse_socket;
 
 extern int dvd_speed; /* stream/stream_dvd.c */
 
+#ifdef CONFIG_ICONV
+extern int sub_ignore_errors;
+#endif
 extern float a52_drc_level;
 
 /* defined in libmpdemux: */

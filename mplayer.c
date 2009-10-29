@@ -192,6 +192,10 @@ static MPContext mpctx_s = {
 static MPContext *mpctx = &mpctx_s;
 
 int fixed_vo=0;
+#ifdef CONFIG_ICONV
+extern char *sub_cps;
+int cp_index_min;
+#endif
 
 // benchmark:
 double video_time_usage=0;
@@ -1047,12 +1051,20 @@ void add_subtitles(char *filename, float fps, int noerr)
 #ifdef CONFIG_ASS
     ass_track_t *asst = 0;
 #endif
+    char *p = NULL;
+    int cp_index = -1;
 
     if (filename == NULL || mpctx->set_of_sub_size >= MAX_SUBTITLE_FILES) {
 	return;
     }
 
-    subd = sub_read_file(filename, fps);
+    // try to load plain text subtilte
+    sub_cp = sub_cps;
+    do {
+        cp_index++;
+        p = strchr(sub_cp, ',');
+        if (p) *p = 0;          // temp change
+        subd = sub_read_file(filename, fps);
 #ifdef CONFIG_ASS
     if (ass_enabled)
 #ifdef CONFIG_ICONV
@@ -1060,6 +1072,15 @@ void add_subtitles(char *filename, float fps, int noerr)
 #else
         asst = ass_read_file(ass_library, filename, 0);
 #endif
+        if (p)
+        {
+            *p = ',';           // restore
+            if (!subd)
+                sub_cp = p + 1; // to next codepage token
+        }
+        else break;             // no more codepage token
+    } while (!subd && sub_cp && *sub_cp);
+
     if (ass_enabled && subd && !asst)
         asst = ass_read_subdata(ass_library, subd, fps);
 

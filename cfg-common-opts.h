@@ -288,7 +288,8 @@
 	{"noflip-hebrew-commas", "MPlayer was compiled without FriBiDi support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
 #endif /* CONFIG_FRIBIDI */
 #ifdef CONFIG_ICONV
-	{"subcp", &sub_cp, CONF_TYPE_STRING, 0, 0, 0, NULL},
+	{"subcp", &sub_cps, CONF_TYPE_STRING, 0, 0, 0, NULL},
+	{"sub-ignore-errors", &sub_ignore_errors, CONF_TYPE_INT, 0, 0, 9999, NULL},
 #endif
 	{"subdelay", &sub_delay, CONF_TYPE_FLOAT, 0, 0.0, 10.0, NULL},
 	{"subfps", &sub_fps, CONF_TYPE_FLOAT, 0, 0.0, 10.0, NULL},
