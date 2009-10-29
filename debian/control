@@ -29,3 +29,13 @@ Description: The Ultimate Movie Player
  And what about the nice big antialiased shaded subtitles (10 supported types)
  with European/ISO 8859-1,2 (Hungarian, English, Czech, etc), Cyrillic, Korean
  fonts, and the onscreen display (OSD)?
+
+Package: mencoder
+Architecture: any
+Depends: ${shlibs:Depends},debconf
+Description: MPlayer's Movie Encoder
+ A simple movie encoder, designed to encode MPlayer-playable movies
+ (AVI/ASF/OGG/DVD/VCD/VOB/MPG/MOV/VIV/FLI/RM/NUV/NET) to other MPlayer-playable
+ formats. It can encode with various codecs, like DivX4 (1 or 2 passes),
+ libavcodec, PCM/MP3/VBRMP3 audio. Also has stream copying and video resizing
+ abilities.
