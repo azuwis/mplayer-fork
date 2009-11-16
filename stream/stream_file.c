@@ -36,276 +36,276 @@ static const struct m_struct_st stream_opts = {
 };
 
 typedef struct {
-	char *filename;
-	unsigned short headSize;
-	unsigned long packSize;
-	unsigned short idx;
-	unsigned char naming;
-	char *basename;
-	off_t fileSize;
+  char *filename;
+  unsigned short headSize;
+  unsigned long packSize;
+  unsigned short idx;
+  unsigned char naming;
+  char *basename;
+  off_t fileSize;
 } stream_0day_priv_t;
 
 static int open_0day_volume(stream_0day_priv_t *p, int i)
 {
-	int h;
-	char *name = (char*)malloc(260);
+  int h;
+  char *name = (char*)malloc(260);
 
-	if (!p->naming) {
-		if (i)
-			sprintf(name, "%s%02d", p->basename, i - 1);
-		else
-			sprintf(name, "%sar", p->basename);
-	}
-    else if(p->headSize == 0) {
-		sprintf(name, "%s%0*d", p->basename, p->naming, i + 1);
-    }
-	else
-		sprintf(name, "%s%0*d.rar", p->basename, p->naming, i + 1);
+  if (!p->naming) {
+    if (i)
+      sprintf(name, "%s%02d", p->basename, i - 1);
+    else
+      sprintf(name, "%sar", p->basename);
+  }
+  else if(p->headSize == 0) {
+    sprintf(name, "%s%0*d", p->basename, p->naming, i + 1);
+  }
+  else
+    sprintf(name, "%s%0*d.rar", p->basename, p->naming, i + 1);
 
-	h = open(name, O_RDONLY);
-	if (h >= 0) {
-		p->idx = i;
-		mp_msg(MSGT_OPEN,MSGL_INFO,"[concat] opening %s\n", name);
-	}
+  h = open(name, O_RDONLY);
+  if (h >= 0) {
+    p->idx = i;
+    mp_msg(MSGT_OPEN,MSGL_INFO,"[concat] opening %s\n", name);
+  }
 
-	free(name);
+  free(name);
 
-	return h;
+  return h;
 }
 
 static void close_0day(stream_t *s)
 {
-	stream_0day_priv_t *p = (stream_0day_priv_t *)s->priv;
+  stream_0day_priv_t *p = (stream_0day_priv_t *)s->priv;
 
-	free(p->filename);
-	free(p->basename);
-	free(p);
+  free(p->filename);
+  free(p->basename);
+  free(p);
 }
 
 static int seek_0day(stream_t *s,off_t newpos)
 {
-	stream_0day_priv_t *p = (stream_0day_priv_t *)s->priv;
-	int i, fd;
+  stream_0day_priv_t *p = (stream_0day_priv_t *)s->priv;
+  int i, fd;
 
-	s->pos = newpos;
-	if (newpos < 0 || newpos > p->fileSize) {
-		s->eof = 1;
-		return 0;
-	}
+  s->pos = newpos;
+  if (newpos < 0 || newpos > p->fileSize) {
+    s->eof = 1;
+    return 0;
+  }
 
-	i = newpos / p->packSize;
-	if (i != p->idx) {
-		fd = open_0day_volume(p, i);
-		if (fd < 0) {
-			s->eof = 1;
-			return 0;
-		}
-		close(s->fd);
-		s->fd = fd;
-	}
+  i = newpos / p->packSize;
+  if (i != p->idx) {
+    fd = open_0day_volume(p, i);
+    if (fd < 0) {
+      s->eof = 1;
+      return 0;
+    }
+    close(s->fd);
+    s->fd = fd;
+  }
 
-	lseek(s->fd, newpos-i*((off_t)p->packSize)+p->headSize, SEEK_SET);
-	return 1;
+  lseek(s->fd, newpos-i*((off_t)p->packSize)+p->headSize, SEEK_SET);
+  return 1;
 }
 
 static int fill_buffer_0day(stream_t *s, char* buffer, int max_len)
 {
-	int r, fd;
-	off_t i, j;
-	stream_0day_priv_t *p = (stream_0day_priv_t *)s->priv;
+  int r, fd;
+  off_t i, j;
+  stream_0day_priv_t *p = (stream_0day_priv_t *)s->priv;
 
-	if ((s->pos >= p->fileSize) && (max_len > 0)) {
-		close(s->fd);
-		s->fd = -1;
-		return -1;
-	}
+  if ((s->pos >= p->fileSize) && (max_len > 0)) {
+    close(s->fd);
+    s->fd = -1;
+    return -1;
+  }
 
-	i = s->pos + max_len;
-	if (i > p->fileSize) {
-		i = p->fileSize;
-		max_len = i - s->pos;
-	}
-	j = (p->idx+1)*((off_t)p->packSize);
-	if (i > j) {
-		j = max_len-(i-j);
-		r = read(s->fd, buffer, j);
-		if (r < j) goto exit_fill_buffer_0day;
+  i = s->pos + max_len;
+  if (i > p->fileSize) {
+    i = p->fileSize;
+    max_len = i - s->pos;
+  }
+  j = (p->idx+1)*((off_t)p->packSize);
+  if (i > j) {
+    j = max_len-(i-j);
+    r = read(s->fd, buffer, j);
+    if (r < j) goto exit_fill_buffer_0day;
 
-		fd = open_0day_volume(p, p->idx+1);
-		if (fd < 0) {
-			s->eof = 1;
-			goto exit_fill_buffer_0day;
-		}
-		close(s->fd);
-		s->fd = fd;
-		lseek(s->fd, p->headSize, SEEK_SET);
-		r += read(s->fd, buffer + r, max_len - r);
-	} else
-		r = read(s->fd, buffer, max_len);
+    fd = open_0day_volume(p, p->idx+1);
+    if (fd < 0) {
+      s->eof = 1;
+      goto exit_fill_buffer_0day;
+    }
+    close(s->fd);
+    s->fd = fd;
+    lseek(s->fd, p->headSize, SEEK_SET);
+    r += read(s->fd, buffer + r, max_len - r);
+  } else
+    r = read(s->fd, buffer, max_len);
 
 exit_fill_buffer_0day:
-	return (r <= 0) ? -1 : r;
+  return (r <= 0) ? -1 : r;
 }
 
 static int rar_open(char *rarname, mode_t m, stream_t *stream)
 {
-	stream_0day_priv_t *p;
-	char RarTag[7], method, type = 0;
-	unsigned short w, n, flag;
+  stream_0day_priv_t *p;
+  char RarTag[7], method, type = 0;
+  unsigned short w, n, flag;
 
-	int h = open(rarname, m);
-	if (h < 0) return h;
+  int h = open(rarname, m);
+  if (h < 0) return h;
 
-	read(h, RarTag, 7);						/* Read Rar!... Tag */
-	if (strncmp(RarTag, "Rar!", 4)) {
-		lseek(h, 0, SEEK_SET);				/* Not a RAR */
-		return h;
-	}
+  read(h, RarTag, 7);						/* Read Rar!... Tag */
+  if (strncmp(RarTag, "Rar!", 4)) {
+    lseek(h, 0, SEEK_SET);				/* Not a RAR */
+    return h;
+  }
 
-	p = (stream_0day_priv_t*)malloc(sizeof(stream_0day_priv_t));
-	memset(p, 0, sizeof(stream_0day_priv_t));
-	p->headSize = 7;
-	while (type != 0x74) {
-		lseek(h, 2, SEEK_CUR);				/* CRC */
-		read(h, &type, 1);					/* Type */
-		read(h, (char*)&flag, 2);			/* Flag */
-		read(h, (char*)&w, 2);				/* Size */
-		p->headSize += w;
-		if (type == 0x73) { /* main header */
-			p->naming = flag & 0x10;
-		} else
-		if (type == 0x74) {	/* file header */
-			read(h, (char*)&(p->packSize), 4);
-			read(h, (char*)&(p->fileSize), 4);
-			lseek(h, 10, SEEK_CUR);			/* Skip OS/CRC/Time/Ver */
-			read(h, &method, 1);			/* Compression Method */
-			read(h, (char*)&n, 2);			/* Size of rarname */
-			if (w == n + 0x2D) {
-				/* fileSize is 64bit */
-				lseek(h, 8, SEEK_CUR);
-				read(h, ((char*)&(p->fileSize))+4, 4);
-			} else {
-				lseek(h, 4, SEEK_CUR);		/* Attr */
-			}
-			p->filename = (char *)malloc(n + 1);
-			read(h, p->filename, n);		/* filename */
-			p->filename[n] = 0;
-		} else
-		if (type == 0x7A) {	/* comment header */
-			read(h, (char*)&w, 2);			/* Size of comment */
-			p->headSize += w;
-		}
-		lseek(h, p->headSize, SEEK_SET);	/* Seek to next header */
-	}
-	mp_msg(MSGT_STREAM,MSGL_INFO, "File Flags=%04x\tCompression Method=%x\n", flag, method);
+  p = (stream_0day_priv_t*)malloc(sizeof(stream_0day_priv_t));
+  memset(p, 0, sizeof(stream_0day_priv_t));
+  p->headSize = 7;
+  while (type != 0x74) {
+    lseek(h, 2, SEEK_CUR);				/* CRC */
+    read(h, &type, 1);					/* Type */
+    read(h, (char*)&flag, 2);			/* Flag */
+    read(h, (char*)&w, 2);				/* Size */
+    p->headSize += w;
+    if (type == 0x73) { /* main header */
+      p->naming = flag & 0x10;
+    } else
+      if (type == 0x74) {	/* file header */
+        read(h, (char*)&(p->packSize), 4);
+        read(h, (char*)&(p->fileSize), 4);
+        lseek(h, 10, SEEK_CUR);			/* Skip OS/CRC/Time/Ver */
+        read(h, &method, 1);			/* Compression Method */
+        read(h, (char*)&n, 2);			/* Size of rarname */
+        if (w == n + 0x2D) {
+          /* fileSize is 64bit */
+          lseek(h, 8, SEEK_CUR);
+          read(h, ((char*)&(p->fileSize))+4, 4);
+        } else {
+          lseek(h, 4, SEEK_CUR);		/* Attr */
+        }
+        p->filename = (char *)malloc(n + 1);
+        read(h, p->filename, n);		/* filename */
+        p->filename[n] = 0;
+      } else
+        if (type == 0x7A) {	/* comment header */
+          read(h, (char*)&w, 2);			/* Size of comment */
+          p->headSize += w;
+        }
+      lseek(h, p->headSize, SEEK_SET);	/* Seek to next header */
+  }
+  mp_msg(MSGT_STREAM,MSGL_INFO, "File Flags=%04x\tCompression Method=%x\n", flag, method);
 
-	if (!(flag & 0x04) && (method == 0x30)) {	/* 0day stream */
-		n = strlen(rarname);
-		p->basename = strdup(rarname);
-		if (p->naming) {
-			p->naming = rarname + n - strrchr(rarname, 't') - 5;
-			n -= (p->naming + 4);
-		} else {
-			n -= 2;
-		}
-		p->basename[n] = 0;
+  if (!(flag & 0x04) && (method == 0x30)) {	/* 0day stream */
+    n = strlen(rarname);
+    p->basename = strdup(rarname);
+    if (p->naming) {
+      p->naming = rarname + n - strrchr(rarname, 't') - 5;
+      n -= (p->naming + 4);
+    } else {
+      n -= 2;
+    }
+    p->basename[n] = 0;
 
-		close(h);
-		h = open_0day_volume(p, 0);
-		if (h < 0) {
-			free(p->filename);
-			free(p->basename);
-			free(p);
-		} else {
-			/* reget packSize, avoid got the last volume's packSize */
-			type = 0;
-			n = 7;
-			lseek(h, 7, SEEK_SET);
-			while (type != 0x74) {
-				lseek(h, 2, SEEK_CUR);				/* CRC */
-				read(h, &type, 1);					/* Type */
-				read(h, (char*)&flag, 2);			/* Flag */
-				read(h, (char*)&w, 2);				/* Size */
-				n += w;
-				if (type == 0x74) {	/* file header */
-					read(h, (char*)&(p->packSize), 4);
-				} else
-				if (type == 0x7A) {	/* comment header */
-					read(h, (char*)&w, 2);			/* Size of comment */
-					n += w;
-				}
-				lseek(h, n, SEEK_SET);	/* Seek to next header */
-			}
+    close(h);
+    h = open_0day_volume(p, 0);
+    if (h < 0) {
+      free(p->filename);
+      free(p->basename);
+      free(p);
+    } else {
+      /* reget packSize, avoid got the last volume's packSize */
+      type = 0;
+      n = 7;
+      lseek(h, 7, SEEK_SET);
+      while (type != 0x74) {
+        lseek(h, 2, SEEK_CUR);				/* CRC */
+        read(h, &type, 1);					/* Type */
+        read(h, (char*)&flag, 2);			/* Flag */
+        read(h, (char*)&w, 2);				/* Size */
+        n += w;
+        if (type == 0x74) {	/* file header */
+          read(h, (char*)&(p->packSize), 4);
+        } else
+          if (type == 0x7A) {	/* comment header */
+            read(h, (char*)&w, 2);			/* Size of comment */
+            n += w;
+          }
+        lseek(h, n, SEEK_SET);	/* Seek to next header */
+      }
 
-			stream->priv = (void*)p;
-			stream->close = close_0day;
-			stream->seek = seek_0day;
-			stream->fill_buffer = fill_buffer_0day;
-			stream->end_pos = p->fileSize;
-			stream->type = STREAMTYPE_FILE;
-		}
-		return h;
-	}
+      stream->priv = (void*)p;
+      stream->close = close_0day;
+      stream->seek = seek_0day;
+      stream->fill_buffer = fill_buffer_0day;
+      stream->end_pos = p->fileSize;
+      stream->type = STREAMTYPE_FILE;
+    }
+    return h;
+  }
 
-	free(p);
-	return h;
+  free(p);
+  return h;
 }
 
 static int concat_open(char *rarname, mode_t m, stream_t *stream)
 {
-	stream_0day_priv_t *p;
-    struct stat sb;
-    unsigned short n;
-    char *ext_of_filename;
+  stream_0day_priv_t *p;
+  struct stat sb;
+  unsigned short n;
+  char *ext_of_filename;
 
-	int h = open(rarname, m);
-	if (h < 0) return h;
+  int h = open(rarname, m);
+  if (h < 0) return h;
 
-	p = (stream_0day_priv_t*)malloc(sizeof(stream_0day_priv_t));
-	memset(p, 0, sizeof(stream_0day_priv_t));
-	p->headSize = 0;
+  p = (stream_0day_priv_t*)malloc(sizeof(stream_0day_priv_t));
+  memset(p, 0, sizeof(stream_0day_priv_t));
+  p->headSize = 0;
 
-	if (fstat(h, &sb) != -1) {	/* get file stat */
-        n = strlen(rarname);
-        ext_of_filename = strrchr(rarname, '.');
-        p->naming = strlen(ext_of_filename) - 1;
-		p->basename = strdup(rarname);
-        n -= p->naming;
-		p->basename[n] = 0;
-        p->filename = strdup(p->basename);
-        p->packSize = sb.st_size;
+  if (fstat(h, &sb) != -1) {	/* get file stat */
+    n = strlen(rarname);
+    ext_of_filename = strrchr(rarname, '.');
+    p->naming = strlen(ext_of_filename) - 1;
+    p->basename = strdup(rarname);
+    n -= p->naming;
+    p->basename[n] = 0;
+    p->filename = strdup(p->basename);
+    p->packSize = sb.st_size;
 
-        close(h);
-        p->idx=0;
-        while ((h = open_0day_volume(p, p->idx)) >= 0) {
-            fstat(h, &sb);
-            p->fileSize += sb.st_size;
-            if (p->packSize != sb.st_size)
-                mp_msg(MSGT_OPEN,MSGL_INFO,"[concat] Warning: fileSize of %s%0*d is NOT eq to packageSize\n", p->basename, p->naming, p->idx + 1);
-            p->idx++;
-            close(h);
-        }
-        close(h);
-        p->idx=0;
+    close(h);
+    p->idx=0;
+    while ((h = open_0day_volume(p, p->idx)) >= 0) {
+      fstat(h, &sb);
+      p->fileSize += sb.st_size;
+      if (p->packSize != sb.st_size)
+        mp_msg(MSGT_OPEN,MSGL_INFO,"[concat] Warning: fileSize of %s%0*d is NOT eq to packageSize\n", p->basename, p->naming, p->idx + 1);
+      p->idx++;
+      close(h);
+    }
+    close(h);
+    p->idx=0;
 
-		h = open_0day_volume(p, 0);
-		if (h < 0) {
-			free(p->filename);
-			free(p->basename);
-			free(p);
-		} else {
-			stream->priv = (void*)p;
-			stream->close = close_0day;
-			stream->seek = seek_0day;
-			stream->fill_buffer = fill_buffer_0day;
-			stream->end_pos = p->fileSize;
-			stream->type = STREAMTYPE_FILE;
-		}
-		return h;
-	}
+    h = open_0day_volume(p, 0);
+    if (h < 0) {
+      free(p->filename);
+      free(p->basename);
+      free(p);
+    } else {
+      stream->priv = (void*)p;
+      stream->close = close_0day;
+      stream->seek = seek_0day;
+      stream->fill_buffer = fill_buffer_0day;
+      stream->end_pos = p->fileSize;
+      stream->type = STREAMTYPE_FILE;
+    }
+    return h;
+  }
 
-	free(p);
-	return h;
+  free(p);
+  return h;
 }
 
 static int fill_buffer(stream_t *s, char* buffer, int max_len){
@@ -348,12 +348,12 @@ static int control(stream_t *s, int cmd, void *arg) {
       off_t size;
 
       if (s->priv) {
-	  	if (s->type == STREAMTYPE_STREAM) return STREAM_UNSUPPORTED;
-	  	size = ((stream_0day_priv_t*)s->priv)->fileSize;
+        if (s->type == STREAMTYPE_STREAM) return STREAM_UNSUPPORTED;
+        size = ((stream_0day_priv_t*)s->priv)->fileSize;
       } else {
       size = lseek(s->fd, 0, SEEK_END);
       lseek(s->fd, s->pos, SEEK_SET);
-	  }
+      }
       if(size != (off_t)-1) {
         *((off_t*)arg) = size;
         return 1;
@@ -408,13 +408,13 @@ static int open_f(stream_t *stream,int mode, void* opts, int* file_format) {
       mp_msg(MSGT_OPEN,MSGL_INFO,MSGTR_ReadSTDIN);
       f=0; // 0=stdin
 #if defined(__MINGW32__) || defined(__OS2__)
-	  setmode(fileno(stdin),O_BINARY);
+      setmode(fileno(stdin),O_BINARY);
 #endif
     } else {
       mp_msg(MSGT_OPEN,MSGL_INFO,"Writing to stdout\n");
       f=1;
 #if defined(__MINGW32__) || defined(__OS2__)
-	  setmode(fileno(stdout),O_BINARY);
+      setmode(fileno(stdout),O_BINARY);
 #endif
     }
   } else {
