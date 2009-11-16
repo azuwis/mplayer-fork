@@ -76,7 +76,6 @@ static int open_0day_volume(stream_0day_priv_t *p, int i)
 
 static void close_0day(stream_t *s)
 {
-  int i;
   stream_0day_priv_t *p = (stream_0day_priv_t *)s->priv;
 
   free(p->splitSize);
