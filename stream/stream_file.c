@@ -37,12 +37,13 @@ static const struct m_struct_st stream_opts = {
 
 typedef struct {
   char *filename;
-  unsigned short headSize;
+  unsigned short headSize; /* headSize == 0 means those are split volumes, not rar volumes */
   unsigned long packSize;
   unsigned short idx;
   unsigned char naming;
   char *basename;
   off_t fileSize;
+  unsigned long *splitSize; /* only used in split volumes */
 } stream_0day_priv_t;
 
 static int open_0day_volume(stream_0day_priv_t *p, int i)
@@ -75,8 +76,10 @@ static int open_0day_volume(stream_0day_priv_t *p, int i)
 
 static void close_0day(stream_t *s)
 {
+  int i;
   stream_0day_priv_t *p = (stream_0day_priv_t *)s->priv;
 
+  free(p->splitSize);
   free(p->filename);
   free(p->basename);
   free(p);
@@ -86,6 +89,7 @@ static int seek_0day(stream_t *s,off_t newpos)
 {
   stream_0day_priv_t *p = (stream_0day_priv_t *)s->priv;
   int i, fd;
+  off_t total = 0;
 
   s->pos = newpos;
   if (newpos < 0 || newpos > p->fileSize) {
@@ -93,7 +97,14 @@ static int seek_0day(stream_t *s,off_t newpos)
     return 0;
   }
 
+  if(p->headSize == 0) {
+    for(i = 0; total <= newpos; i++) {
+      total += p->splitSize[i];
+    }
+    i--;
+  } else {
   i = newpos / p->packSize;
+  }
   if (i != p->idx) {
     fd = open_0day_volume(p, i);
     if (fd < 0) {
@@ -104,13 +115,18 @@ static int seek_0day(stream_t *s,off_t newpos)
     s->fd = fd;
   }
 
+  if(p->headSize == 0) {
+    lseek(s->fd, newpos-total+p->splitSize[i], SEEK_SET);
+  } else {
   lseek(s->fd, newpos-i*((off_t)p->packSize)+p->headSize, SEEK_SET);
+  }
   return 1;
 }
 
 static int fill_buffer_0day(stream_t *s, char* buffer, int max_len)
 {
   int r, fd;
+  int k;
   off_t i, j;
   stream_0day_priv_t *p = (stream_0day_priv_t *)s->priv;
 
@@ -125,7 +141,14 @@ static int fill_buffer_0day(stream_t *s, char* buffer, int max_len)
     i = p->fileSize;
     max_len = i - s->pos;
   }
+  if(p->headSize == 0) {
+    j = 0;
+    for (k = 0; k <= p->idx; k++) {
+      j += p->splitSize[k];
+    }
+  } else {
   j = (p->idx+1)*((off_t)p->packSize);
+  }
   if (i > j) {
     j = max_len-(i-j);
     r = read(s->fd, buffer, j);
@@ -276,12 +299,20 @@ static int concat_open(char *rarname, mode_t m, stream_t *stream)
     p->packSize = sb.st_size;
 
     close(h);
-    p->idx=0;
+    p->idx = 0;
+    while ((h = open_0day_volume(p, p->idx)) >= 0) {
+      p->idx++;
+      close(h);
+    }
+    mp_msg(MSGT_OPEN,MSGL_INFO,"[concat] Info: total %d volumes\n", p->idx);
+    p->splitSize = (unsigned long*)malloc(sizeof(unsigned long)*(p->idx));
+    p->idx = 0;
     while ((h = open_0day_volume(p, p->idx)) >= 0) {
       fstat(h, &sb);
       p->fileSize += sb.st_size;
+      p->splitSize[p->idx] = sb.st_size;
       if (p->packSize != sb.st_size)
-        mp_msg(MSGT_OPEN,MSGL_INFO,"[concat] Warning: fileSize of %s%0*d is NOT eq to packageSize\n", p->basename, p->naming, p->idx + 1);
+        mp_msg(MSGT_OPEN,MSGL_INFO,"[concat] Warning: fileSize of %s%0*d is NOT eq to first volume\n", p->basename, p->naming, p->idx + 1);
       p->idx++;
       close(h);
     }
