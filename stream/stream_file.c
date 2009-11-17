@@ -275,7 +275,10 @@ static int rar_open(char *rarname, mode_t m, stream_t *stream)
 
 static int concat_open(char *rarname, mode_t m, stream_t *stream)
 {
+#define SLIPT_SIZE_FACTOR 15
   stream_0day_priv_t *p;
+  unsigned long *rtmp;
+  unsigned short mul;
   struct stat sb;
   unsigned short n;
   char *ext_of_filename;
@@ -298,15 +301,25 @@ static int concat_open(char *rarname, mode_t m, stream_t *stream)
     p->packSize = sb.st_size;
 
     close(h);
+    p->splitSize = (unsigned long*)malloc(sizeof(unsigned long) * SLIPT_SIZE_FACTOR);
     p->idx = 0;
+    mul = 1;
     while ((h = open_0day_volume(p, p->idx)) >= 0) {
-      p->idx++;
-      close(h);
-    }
-    mp_msg(MSGT_OPEN,MSGL_INFO,"[concat] Info: total %d volumes\n", p->idx);
-    p->splitSize = (unsigned long*)malloc(sizeof(unsigned long)*(p->idx));
-    p->idx = 0;
-    while ((h = open_0day_volume(p, p->idx)) >= 0) {
+      if(p->idx >= (SLIPT_SIZE_FACTOR * mul)) {
+        mul++;
+        rtmp = (unsigned long*)realloc(p->splitSize, sizeof(unsigned long) * SLIPT_SIZE_FACTOR * mul);
+	if (rtmp != NULL) {
+          p->splitSize = rtmp;
+	} else {
+          mp_msg(MSGT_OPEN,MSGL_INFO,"[concat] Error: realloc failed\n");
+          free(p->splitSize);
+          free(p->filename);
+          free(p->basename);
+          free(p);
+          close(h);
+          return -1;
+	}
+      }
       fstat(h, &sb);
       p->fileSize += sb.st_size;
       p->splitSize[p->idx] = sb.st_size;
@@ -315,11 +328,23 @@ static int concat_open(char *rarname, mode_t m, stream_t *stream)
       p->idx++;
       close(h);
     }
-    close(h);
+    rtmp = (unsigned long*)realloc(p->splitSize, sizeof(unsigned long) * p->idx);
+    if (rtmp != NULL) {
+      p->splitSize = rtmp;
+    } else {
+      mp_msg(MSGT_OPEN,MSGL_INFO,"[concat] Error: realloc failed\n");
+      free(p->splitSize);
+      free(p->filename);
+      free(p->basename);
+      free(p);
+      return -1;
+    }
+    mp_msg(MSGT_OPEN,MSGL_INFO,"[concat] Info: total %d volumes\n", p->idx);
     p->idx=0;
 
     h = open_0day_volume(p, 0);
     if (h < 0) {
+      free(p->splitSize);
       free(p->filename);
       free(p->basename);
       free(p);
