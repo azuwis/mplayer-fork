@@ -88,7 +88,6 @@ static int seek_0day(stream_t *s,off_t newpos)
 {
   stream_0day_priv_t *p = (stream_0day_priv_t *)s->priv;
   int i, fd;
-  off_t total = 0;
 
   s->pos = newpos;
   if (newpos < 0 || newpos > p->fileSize) {
@@ -96,14 +95,7 @@ static int seek_0day(stream_t *s,off_t newpos)
     return 0;
   }
 
-  if(p->headSize == 0) {
-    for(i = 0; total <= newpos; i++) {
-      total += p->splitSize[i];
-    }
-    i--;
-  } else {
   i = newpos / p->packSize;
-  }
   if (i != p->idx) {
     fd = open_0day_volume(p, i);
     if (fd < 0) {
@@ -114,11 +106,37 @@ static int seek_0day(stream_t *s,off_t newpos)
     s->fd = fd;
   }
 
-  if(p->headSize == 0) {
-    lseek(s->fd, newpos-total+p->splitSize[i], SEEK_SET);
-  } else {
   lseek(s->fd, newpos-i*((off_t)p->packSize)+p->headSize, SEEK_SET);
+  return 1;
+}
+
+static int seek_concat(stream_t *s,off_t newpos)
+{
+  stream_0day_priv_t *p = (stream_0day_priv_t *)s->priv;
+  int i, fd;
+  off_t total = 0;
+
+  s->pos = newpos;
+  if (newpos < 0 || newpos > p->fileSize) {
+    s->eof = 1;
+    return 0;
   }
+
+  for(i = 0; total <= newpos; i++) {
+    total += p->splitSize[i];
+  }
+  i--;
+  if (i != p->idx) {
+    fd = open_0day_volume(p, i);
+    if (fd < 0) {
+      s->eof = 1;
+      return 0;
+    }
+    close(s->fd);
+    s->fd = fd;
+  }
+
+  lseek(s->fd, newpos-total+p->splitSize[i], SEEK_SET);
   return 1;
 }
 
@@ -140,14 +158,7 @@ static int fill_buffer_0day(stream_t *s, char* buffer, int max_len)
     i = p->fileSize;
     max_len = i - s->pos;
   }
-  if(p->headSize == 0) {
-    j = 0;
-    for (k = 0; k <= p->idx; k++) {
-      j += p->splitSize[k];
-    }
-  } else {
   j = (p->idx+1)*((off_t)p->packSize);
-  }
   if (i > j) {
     j = max_len-(i-j);
     r = read(s->fd, buffer, j);
@@ -166,6 +177,49 @@ static int fill_buffer_0day(stream_t *s, char* buffer, int max_len)
     r = read(s->fd, buffer, max_len);
 
 exit_fill_buffer_0day:
+  return (r <= 0) ? -1 : r;
+}
+
+static int fill_buffer_concat(stream_t *s, char* buffer, int max_len)
+{
+  int r, fd;
+  int k;
+  off_t i, j;
+  stream_0day_priv_t *p = (stream_0day_priv_t *)s->priv;
+
+  if ((s->pos >= p->fileSize) && (max_len > 0)) {
+    close(s->fd);
+    s->fd = -1;
+    return -1;
+  }
+
+  i = s->pos + max_len;
+  if (i > p->fileSize) {
+    i = p->fileSize;
+    max_len = i - s->pos;
+  }
+  j = 0;
+  for (k = 0; k <= p->idx; k++) {
+    j += p->splitSize[k];
+  }
+  if (i > j) {
+    j = max_len-(i-j);
+    r = read(s->fd, buffer, j);
+    if (r < j) goto exit_fill_buffer_concat;
+
+    fd = open_0day_volume(p, p->idx+1);
+    if (fd < 0) {
+      s->eof = 1;
+      goto exit_fill_buffer_concat;
+    }
+    close(s->fd);
+    s->fd = fd;
+    lseek(s->fd, p->headSize, SEEK_SET);
+    r += read(s->fd, buffer + r, max_len - r);
+  } else
+    r = read(s->fd, buffer, max_len);
+
+exit_fill_buffer_concat:
   return (r <= 0) ? -1 : r;
 }
 
@@ -351,8 +405,8 @@ static int concat_open(char *rarname, mode_t m, stream_t *stream)
     } else {
       stream->priv = (void*)p;
       stream->close = close_0day;
-      stream->seek = seek_0day;
-      stream->fill_buffer = fill_buffer_0day;
+      stream->seek = seek_concat;
+      stream->fill_buffer = fill_buffer_concat;
       stream->end_pos = p->fileSize;
       stream->type = STREAMTYPE_FILE;
     }
