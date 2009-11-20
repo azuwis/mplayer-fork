@@ -353,6 +353,7 @@ edl_record_ptr next_edl_record = NULL; ///< only for traversing edl_records
 short edl_decision = 0; ///< 1 when an EDL operation has been made.
 FILE* edl_fd = NULL; ///< fd to write to when in -edlout mode.
 int use_filedir_conf;
+int use_filename_title;
 
 static unsigned int initialized_flags=0;
 #include "mpcommon.h"
@@ -652,7 +653,8 @@ void uninit_player(unsigned int mask){
     initialized_flags&=~INITIALIZED_AO;
     current_module="uninit_ao";
     if (mpctx->edl_muted) mixer_mute(&mpctx->mixer);
-    mpctx->audio_out->uninit(mpctx->eof?0:1); mpctx->audio_out=NULL;
+    if (mpctx->audio_out) mpctx->audio_out->uninit(mpctx->eof?0:1);
+    mpctx->audio_out=NULL;
   }
 
 #ifdef CONFIG_GUI
@@ -3110,9 +3112,12 @@ while (player_idle_mode && !filename) {
 }
 //---------------------------------------------------------------------------
 
-    if(filename)
+    if(filename) {
 	mp_msg(MSGT_CPLAYER,MSGL_INFO,MSGTR_Playing,
 		filename_recode(filename));
+        if(use_filename_title && vo_wintitle == NULL)
+            vo_wintitle = strdup ( mp_basename2 (filename));
+    }
 
 if (edl_filename) {
     if (edl_records) free_edl(edl_records);
@@ -3218,10 +3223,6 @@ if(stream_dump_type==5){
   int len;
   FILE *f;
   current_module="dumpstream";
-  if(mpctx->stream->type==STREAMTYPE_STREAM && mpctx->stream->fd<0){
-    mp_msg(MSGT_CPLAYER,MSGL_FATAL,MSGTR_DumpstreamFdUnavailable);
-    exit_player(EXIT_ERROR);
-  }
   stream_reset(mpctx->stream);
   stream_seek(mpctx->stream,mpctx->stream->start_pos);
   f=fopen(stream_dump_name,"wb");
