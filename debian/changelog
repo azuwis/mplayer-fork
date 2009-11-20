@@ -1,9 +1,3 @@
-mplayer (1:1.0.rc2svn${misc:date}-r${misc:svn}) unstable; urgency=low
-
-  * New upstream snapshot
-
- -- Jianxin Zhong (azuwis) <azuwis@gmail.com>  Thu, 12 Nov 2009 11:26:21 +0800
-
 mplayer (1.0svn) unstable; urgency=low
 
   * change version naming from cvs to svn.

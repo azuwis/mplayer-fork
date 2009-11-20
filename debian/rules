@@ -68,10 +68,6 @@ binary-arch: build
 	mkdir -p debian/mencoder/usr/bin
 	mv $(prefix)/usr/bin/mencoder debian/mencoder/usr/bin/
 
-	# auto update debian version
-	echo "misc:date=$(shell date +%Y%m%d)" | tee -a debian/mplayer.substvars debian/mencoder.substvars
-	echo "misc:svn=$(shell LC_ALL=C git svn info 2> /dev/null | grep Revision | cut -d' ' -f2)" | tee -a debian/mplayer.substvars debian/mencoder.substvars
-
 	dh_installdebconf
 	dh_installexamples etc/example.conf etc/dvb-menu.conf etc/input.conf etc/menu.conf
 	dh_installmenu
@@ -87,7 +83,7 @@ binary-arch: build
 	dh_installdeb
 	dh_perl
 	dh_shlibdeps
-	dh_gencontrol
+	dh_gencontrol -- -v1:1.0.rc2svn$(shell date +%Y%m%d)-r$(shell LC_ALL=C git svn info 2> /dev/null | grep Revision | cut -d' ' -f2)
 	dh_md5sums
 	dh_builddeb
 
