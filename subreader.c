@@ -19,6 +19,7 @@
 #include "mp_msg.h"
 #include "subreader.h"
 #include "stream/stream.h"
+#include "libavutil/common.h"
 
 #ifdef CONFIG_ENCA
 #include <enca.h>
@@ -1147,10 +1148,7 @@ subtitle* subcp_recode (subtitle *sub)
 #endif
 
 #ifdef CONFIG_FRIBIDI
-#ifndef max
-#define max(a,b)  (((a)>(b))?(a):(b))
-#endif
-subtitle* sub_fribidi (subtitle *sub, int sub_utf8)
+static subtitle* sub_fribidi (subtitle *sub, int sub_utf8)
 {
   FriBidiChar logical[LINE_LEN+1], visual[LINE_LEN+1]; // Hopefully these two won't smash the stack
   char        *ip      = NULL, *op     = NULL;
@@ -1159,7 +1157,8 @@ subtitle* sub_fribidi (subtitle *sub, int sub_utf8)
   int l=sub->lines;
   int char_set_num;
   fribidi_boolean log2vis;
-  if(flip_hebrew) { // Please fix the indentation someday
+  if (!flip_hebrew)
+    return sub;
   fribidi_set_mirroring(1);
   fribidi_set_reorder_nsm(0);
 
@@ -1184,7 +1183,7 @@ subtitle* sub_fribidi (subtitle *sub, int sub_utf8)
     if(log2vis) {
       len = fribidi_remove_bidi_marks (visual, len, NULL, NULL,
 				       NULL);
-      if((op = malloc((max(2*orig_len,2*len) + 1))) == NULL) {
+      if((op = malloc((FFMAX(2*orig_len,2*len) + 1))) == NULL) {
 	mp_msg(MSGT_SUBREADER,MSGL_WARN,"SUB: error allocating mem.\n");
 	l++;
 	break;
@@ -1198,7 +1197,6 @@ subtitle* sub_fribidi (subtitle *sub, int sub_utf8)
     for (l = sub->lines; l;)
       free (sub->text[--l]);
     return ERR;
-  }
   }
   return sub;
 }
